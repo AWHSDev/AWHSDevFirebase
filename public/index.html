@@ -6,6 +6,56 @@
         <title>AWHS Dev</title>
         <style media="screen">
         </style>
+        <script>
+            function New(type, data = {}) {
+                const element = document.createElement(type)
+                for(const key in data)
+                    element[key] = data[key]
+
+                if('children' in data && data.children instanceof Array)
+                    for(const child of data.children)
+                        element.appendChild(child)
+
+                if('style' in data && typeof(data.style) === 'object')
+                    for(const property in data.style)
+                        element.style[property] = data.style[property]
+
+                return element
+            }
+
+            let data;
+            window.onload = async function() {
+                data = await getDataFromTable(
+                        await (
+                            await (
+                                fetch('https://awhsdev.repl.co/assets/dynamic/table.html')
+                            )
+                        )
+                        .text()
+                    )
+            }
+
+
+            
+
+            async function getDataFromTable(html) {
+                
+                const frame = document.createElement('iframe')
+                frame.srcdoc = html
+                frame.sandbox = 'allow-same-origin'
+                document.body.appendChild(frame)
+
+                return new Promise(resolve => frame.onload = function() {
+                    
+                    const rowData = [...frame.contentWindow.document.querySelectorAll('tr')].map(row => [...row.querySelectorAll('td')].map(cell => cell.textContent))
+                    const headerData = rowData[1].map(header => header.toLowerCase().replace(/ .*/g, ''))
+                    
+                    document.body.removeChild(frame)
+
+                    resolve(rowData.slice(3).map(row => Object.fromEntries(row.map((value, index) => [headerData[index], value]))))
+                })
+            }
+        </script>
     </head>
     <body>
         <h1>Hello World</h1>
