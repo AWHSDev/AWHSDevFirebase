@@ -53,7 +53,11 @@
                     
                     document.body.removeChild(frame)
 
-                    resolve(rowData.slice(3).map(row => Object.fromEntries(row.map((value, index) => [headerData[index], value]))))
+                    resolve(rowData.slice(3).map(row => {
+                        const object = Object.fromEntries(row.map((value, index) => [headerData[index], value]))
+                        delete object['']
+                        return object
+                    }))
                 })
             }
         </script>
