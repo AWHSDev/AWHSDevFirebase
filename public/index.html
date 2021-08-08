@@ -42,6 +42,7 @@
                 
                 const frame = document.createElement('iframe')
                 frame.srcdoc = html
+                frame.style.display = 'none'
                 frame.sandbox = 'allow-same-origin'
                 document.body.appendChild(frame)
 
