@@ -1,12 +1,136 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>AWHS Dev</title>
-        <style media="screen">
+        <link rel="shortcut icon" type="img/png" href="favicon.png">
+        <style>
+            body {
+                background-color: gray;
+                font-family: Arial, Helvetica, sans-serif;
+            }
+            fieldset, legend, header {
+                background-color: whitesmoke;
+                border: 3px solid black;
+                padding: 0.5em;
+                box-shadow:0 2px 5px 0 rgba(0,0,0,0.16),0 2px 10px 0 rgba(0,0,0,0.12);
+            }
+            header {
+                margin: 0.5em;
+            }
+            fieldset {
+                margin: 0.5em;
+            }
+            fieldset > * {
+                margin: 0.25em;
+            }
+            h1 {
+                color: darkcyan;
+            }
+            h3 {
+                color: rgb(78, 78, 78);
+            }
+            input[type=submit], input[type=reset], button {
+                border: none; 
+                background-color: gray;
+                color: white;
+                padding: 0.25em;
+                cursor: pointer;
+            }
+            input[type=submit]:hover, input[type=reset]:hover, button:hover {
+                filter: brightness(125%)
+            }
+            input[type=submit], button {
+                background-color: darkcyan;
+            }
+            input[type=submit]:disabled {
+                background-color: lightgray;
+                color: gray;
+                cursor: not-allowed;
+            }
+            i {
+                background-color: gray;
+                position: relative;
+                top: -0.5em;
+                font-size: 0.75em;
+                color: white;
+                user-select: none;
+                display: inline-block;
+                text-align: center;
+                border-radius: 50%;
+                width: 1.1em;
+                height: 1.1em;
+            }
+
+            #scroll-to-top {
+                box-shadow:0 2px 5px 0 rgba(0,0,0,0.16),0 2px 10px 0 rgba(0,0,0,0.12);
+                position: fixed;
+                right: 0.5em;
+                bottom: 0.5em;
+                padding: 0.5em;
+            }
         </style>
         <script>
+            function ElementArrayProxy(elements) {
+                return new Proxy(elements, {
+                    set: function(target, property, value) {
+                        return target.forEach(o => o[property] = value), false;
+                    },
+                    get: function(target, property, reciever) {
+                        if(typeof property === 'symbol') return [...elements][property];
+                        if(property.startsWith('$') && property !== '$')
+                            if(typeof [...elements][property.substr(1)] === 'function') return function() {return [...elements][property.substr(1)](...arguments)}
+                            else return [...elements][property.substring(1)]
+
+                        return [...elements].some(o => typeof o[property] === 'function') ? function() {return [...elements].map(o => typeof o[property] === 'function' ? o[property](...arguments) : o[property])} : new ElementArrayProxy([...elements].map(o => o[property]));
+                    }
+                });
+            }
+
+            function interpolate(strings, values) {
+                let result = strings[0]
+                for(let i = 0; i < values.length; i++) {
+                    result += values[i]
+                    result += strings[i+1]
+                }
+                return result;
+            }
+            
+            $ = function(selector, startNode = document) {
+                if(selector instanceof Array) {
+                    selector = interpolate(selector, [...arguments].slice(1))
+                    startNode = document
+                }
+
+                return $it = startNode.querySelector(selector);
+            }
+            _$ = $;
+            HTMLElement.prototype.$ = function(selector) {
+                
+                if(selector instanceof Array) {
+                    selector = interpolate(selector, [...arguments].slice(1))
+                }
+                
+                return $(selector, this);
+            }
+            HTMLElement.prototype.$$ = function(selector) {
+                if(selector instanceof Array) {
+                    selector = interpolate(selector, [...arguments].slice(1))
+                }
+                
+                return $$(selector, this);
+            }
+            $$ = function(selector, startNode = document) {
+                if(selector instanceof Array) {
+                    selector = interpolate(selector, [...arguments].slice(1))
+                    startNode = document
+                }
+                
+                return $$it = new ElementArrayProxy(startNode.querySelectorAll(selector));
+            }
+            _$$ = $$;
+
             function New(type, data = {}) {
                 const element = document.createElement(type)
                 for(const key in data)
@@ -19,24 +143,115 @@
                 if('style' in data && typeof(data.style) === 'object')
                     for(const property in data.style)
                         element.style[property] = data.style[property]
-
+                
                 return element
             }
-
-            let data;
+            
+            let data, mappedData
             window.onload = async function() {
+                $$`i`.$forEach(i => {
+                    i.title = i.innerHTML
+                    i.textContent = 'i'
+                })
+
+                const email = $`#email`
+                email.href='mailto:' + (email.title = email.textContent = 
+                    (![]+[])[+!![]] + String.fromCharCode(110+9) + [...'hello world'].shift() + (typeof ([] + []))[+![]] + ([{}][+!![]] + [])[+!![]+(+!![])] + (![] + [])[+!![]+(+!![])+(+!![])+(+!![])] + String.fromCharCode(86).toLowerCase() + '@' + 'gm'/*Bad Bots*/+/*No email for you*/'ail' + '.com'
+
+                )
+
+
+                $$`.tag`.$forEach(it => {
+                    it.insertAdjacentElement('afterend', New('ol', {}))
+                    it.onkeydown = function(event) {
+                        if(['Enter', ',', ' ', 'Tab'].includes(event.key)) {
+                            event.preventDefault()
+                            const ol = $(`#${this.id} + ol`)
+                            const li = New('li' , {
+                                children: [
+                                    New('strong', {
+                                        textContent: this.value
+                                    }),
+                                    New('span', {
+                                        textContent: ' [X]',
+                                        title: 'Delete',
+                                        style: {
+                                            cursor: 'pointer'
+                                        },
+                                        onclick: () => ol.removeChild(li)
+                                    })
+                                ]
+                            })
+                            ol.appendChild(li)
+                            this.value = ''
+                        }
+                        else if(event.key === 'Backspace' && this.value === '') {
+                            const ol = $(`#${this.id} + ol`)
+                            const li = ol.$`li:last-child`
+                            event.preventDefault()
+                            if(!li) return
+                            this.value = li.$`strong`.textContent
+                            ol.removeChild(li)
+                        }
+                    }
+                })
+
                 data = await getDataFromTable(
+                    await (
                         await (
-                            await (
-                                fetch('https://awhsdev.repl.co/assets/dynamic/table.html')
-                            )
+                            fetch('https://awhsdev.repl.co/assets/dynamic/table.html')
                         )
-                        .text()
                     )
+                    .text()
+                )
+
+                mappedData = data.map(source => ({
+                    source,
+                    renewable: /\(renewable\)/i.test(source.amount) ? 'Yes' : /\(non-renewable\)/i.test(source.amount) ? 'No' : '?',
+                    sat: /.*?SAT[^0-9]*?[≥>][^0-9]*?([0-9]{3,4})([^0-9]|$).*/is.test(source.eligibility) ? source.eligibility.replace(/.*?SAT[^0-9]*?[≥>][^0-9]*?([0-9]{3,4})([^0-9]|$).*/is, '$1') : /.*?[≥>][^0-9]*?([0-9]{3,4})[^0-9]*?SAT.*/is.test(source.eligibility) ? source.eligibility.replace(/.*?[≥>][^0-9]*?([0-9]{3,4})[^0-9]*?SAT.*/is, '$1') : '?',
+                    act: /.*?ACT[^0-9]*?[≥>][^0-9]*?([0-9]{2})(?:[^0-9]|$).*/is.test(source.eligibility) ? source.eligibility.replace(/.*?ACT[^0-9]*?[≥>][^0-9]*?([0-9]{2})(?:[^0-9]|$).*/is, '$1') : /.*?[≥>][^0-9]*?([0-9]{2})[^0-9]*?ACT.*/is.test(source.eligibility) ? source.eligibility.replace(/.*?[≥>][^0-9]*?([0-9]{2})[^0-9]*?ACT.*/is, '$1') : '?',
+                    gpa: /.*?GPA[^0-9]*?([0-9]\.[0-9])([^0-9]|$).*/is.test(source.eligibility) ? source.eligibility.replace(/.*?GPA[^0-9]*?([0-9]\.[0-9])([^0-9]|$).*/is, '$1') : /.*?(?:^|[^0-9])([0-9]\.[0-9])[^0-9]*?GPA.*/is.test(source.eligibility) ? source.eligibility.replace(/.*?(?:^|[^0-9])([0-9]\.[0-9])[^0-9]*?GPA.*/is, '$1') : '?',
+                    deadline: (function(str) {
+                        const date = new Date(str.replace(/([0-9])(?:st|nd|rd|th)/, '$1'))
+                        if(date.toString() === 'Invalid Date') {
+                            if(str.match(/(January|February|March|April|May|June|July|August|September|October|November|December) *?([0-9]{1,2}) *?(?:st|nd|rd|th)/i))
+                            return {
+                                ...arguments.callee(str.match(/(January|February|March|April|May|June|July|August|September|October|November|December) *?([0-9]{1,2}) *?(?:st|nd|rd|th)/i)[0]),
+                                absolute: false
+                            }
+                        else switch(str.toLowerCase()) {
+                            case 'none':
+                            case 'ongoing':
+                                return {
+                                    date: (now => (now.setYear(now.getFullYear() + 10), now))(new Date()),
+                                    absolute: false,
+                                    text: 'None'
+                                }
+                            case 'closed':
+                                return {
+                                    date: (past => (past.setTime(0), past))(new Date()),
+                                    absolute: false,
+                                    text: 'Closed'
+                                }
+                            default:
+                                return {
+                                    date,
+                                    absolute: false,
+                                    text: '?'
+                                }
+                            }
+                        } else return {
+                            date,
+                            absolute: true,
+                            text: date.toLocaleDateString('en-US', {month: 'long', day: 'numeric'})
+                        }
+                    })(source.deadline.trim())
+                }))
+                const submit = $`input[type=submit]`
+                submit.value = 'Search'
+                submit.removeAttribute('disabled')
             }
 
-
-            
 
             async function getDataFromTable(html) {
                 
@@ -60,9 +275,190 @@
                     }))
                 })
             }
-        </script>
+            //data.filter(o => /\b(?:m[ea]n|male)\b/i.test(o.eligibility) || /\b(?:m[ea]n|male)\b/i.test(o.name))
+            </script>
     </head>
     <body>
-        <h1>Hello World</h1>
+        <form onsubmit="event.preventDefault(), false">
+            <header>
+                <h1>Scholorship Search</h1>
+                <p>&copy; T Wasinger 2021</p>
+                <h3>All questions are optional, but the more information you give the better results you will get.</h3>
+                <h3>For more details on a something, hover over the <i>Hello o(*°▽°*)o</i> icon.</h3>
+                <h3>If you run into an issue, please report it to <a id="email" name="email" target="_blank"></a> or create an issue <a href="https://github.com/AWHSDev/AWHSDevFirebase/issues" title="Create an Issue" target="_blank">here</a>.</h3>
+                <h3>Want to help out? You can contribute over on the <a href="https://github.com/AWHSDev/AWHSDevFirebase" title="AWHS Dev GitHub Repository" target="_blank">GitHub repository</a></h3>
+            </header>
+            <header>
+                <h2>Privacy Notice: Your data never leaves your device and is only used to provde you relevant search results. <i>All processing happends on your device. This website does not store any of your data; however, your browser may choose to store information you input in case you visit this page again.</i></h2>
+            </header>
+            <fieldset>
+                <legend>General Options <i>Basic info about you and what you are searching for.</i></legend>
+                
+                <label for="input-sort-mode">Sort By: <i>Order results by how well they match you, alphabetically, how much they are worth, or how soon they close.</i></label>
+                <select id="input-sort-mode" name="input-sort-mode" onchange="updateSearchFields(this.value)">
+                    <option value="relevance">Relevance</option>
+                    <option value="name">Name</option>
+                    <option value="amount">Amount</option>
+                    <option value="deadline">Deadline</option>
+                </select><br>
+                <script>
+                    function updateSearchFields(value) {
+                        let fields = $`#search-fields`
+                        if(value === 'relevance') {
+                            fields.style.display = ''
+                        }
+                        else {
+                            fields.style.display = 'none'
+                        }
+                    }
+                </script>
+                <div id="search-fields" name="search-fields">
+                    <label for="input-search-query">Search Terms: <i>Put your primary search terms in this box. Seperate different entries with a comma.</i></label>
+                    <input class="tag" type="text" id="input-search-query" name="input-search-query">
+
+                    <label for="input-search-query-not">Ignore Terms: <i>Put terms to avoid in this box. Seperate different entries with a comma.</i></label>
+                    <input class="tag" type="text" id="input-search-query-not" name="input-search-query-not">
+
+                    <input type="checkbox" id="input-renewable" name="input-renewable">
+                    <label for="input-renewable">Must be renewable? <i>Some scholorships can be obtained for each year that you study, others are a one time deal.</i></label><br>
+
+                    <input type="checkbox" id="input-open" name="input-open" checked>
+                    <label for="input-open">Must be open? <i>Some scholorships may no longer be accepting applications.</i></label><br>
+
+                    <label for="input-sat-score">SAT Score: <i>Your combinded SAT Score (400-1600)</i></label>
+                    <input type="number" id="input-sat-score" name="input-sat-score" min="400" max="1600" value="">
+
+                    <br>
+
+                    <label for="input-act-score">ACT Score: <i>Your combinded ACT Score (400-1600)</i></label>
+                    <input type="number" id="input-act-score" name="input-act-score" min="1" max="36" value="">
+
+                    <br>
+                    
+                    <label for="input-fr-lunch">Qualify For Free or Reduced Lunch: <i>Some scholorships use this as a basis for deciding financial need.</i></label>
+                    <select id="input-fr-lunch" name="input-fr-lunch">
+                        <option value="unset"></option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select><br>
+
+                    <label for="input-race">Race: <i>Some scholorships are based on race/ethnicity, but feel free to skip this question if you don't want to answer it.</i></label>
+                    <select id="input-race" name="input-race">
+                        <option value="unset"></option>
+                        <option value="American Indian, Alaska Native">American Indian or Alaska Native</option>
+                        <option value="Asian">Asian</option>
+                        <option value="Black, African American">Black or African American</option>
+                        <option value="Native Hawaiian, Pacific Islander">Native Hawaiian or Other Pacific Islander</option>
+                        <option value="White">White</option>
+                    </select><br>
+
+                    <label for="input-ethnicity">Hispanic or Latino: <i>Some scholorships are based on race/ethnicity, but feel free to skip this question if you don't want to answer it.</i></label>
+                    <select id="input-ethnicity" name="input-ethnicity">
+                        <option value="unset"></option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select><br>
+
+
+                    <lablel for="inout-gender">Gender: <i>Some scholorships are for specific genders, but feel free to skip this question if you would rather not answer it.</i></lablel>
+                    <script>
+                        function updateGenderInputs(value) {
+                            let field = $`#add-another-gender-option`
+                            if(value === 'not-listed') {
+                                field.style.display = ''
+                                field.$`input`.focus()
+                            }
+                            else {
+                                field.style.display = 'none'
+                                field.$`input`.value = ''
+                            }
+                            if(value === 'enby') $`#enby-flag`.style.display = ''
+                            else $`#enby-flag`.style.display = 'none'
+                        }
+                    </script>
+                    <select id="input-gender" name="input-gender" onchange="updateGenderInputs(this.value)">
+                        <option value="unset"></option>  
+                        <option value="female">Female</option>
+                        <option value="male">Male</option>
+                        <option value="enby">Non-Binary</option>
+                        <option value="not-listed">Not Listed (Manual Entry)</option>
+                    </select>
+                    <!-- (o゜▽゜)o 🏳‍🌈 -->
+                    <svg viewBox="0 0 5 4" xmlns="http://www.w3.org/2000/svg" id="enby-flag" style="display: none; height: 1.5em; position: absolute; margin-left: 0.2em; box-shadow:0 2px 5px 0 rgba(0,0,0,0.16),0 2px 10px 0 rgba(0,0,0,0.12);">
+                        <rect width="5" height="1" y="0" fill="yellow"/>
+                        <rect width="5" height="1" y="1" fill="white"/>
+                        <rect width="5" height="1" y="2" fill="purple"/>
+                        <rect width="5" height="1" y="3" fill="black"/>
+                    </svg>
+                    <span id="add-another-gender-option" name="add-another-gender-option" style="display: none">
+                        <lablel for="input-gender-not-listed">:</lablel>
+                        <input type="text" id="input-gender-not-listed" name="input-gender-not-listed" placeholder="">
+                        <i>You can add words to describe your gender here to search for related scholorships. Seperate different phrases with a comma.</i>
+                    </span>
+                    <br>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Advanced Options <i>These are more advanced search tools for the technically inclined. If you don't know what you're doing, ignore these.</i></legend>
+                
+                <details>
+                    <summary>Regex Filter  <i>Add a pattern and mark flags here to show only matching results. Do not wrap yout input in slashes.</i></summary>
+                    <label for="input-regex-pattern">Pattern:</label><br>
+                    <textarea id="input-regex-pattern" name="input-regex-pattern"></textarea><br>
+                    
+                    <input type="checkbox" id="input-regex-g" name="input-regex-g">
+                    <label for="input-regex-g">Match All (g)</label><br>
+                    
+                    <input type="checkbox" id="input-regex-m" name="input-regex-m">
+                    <label for="input-regex-m">Multi-line (m)</label><br>
+                    
+                    <input type="checkbox" id="input-regex-i" name="input-regex-i">
+                    <label for="input-regex-i">Case Insensitive (i)</label><br>
+                    
+                    <input type="checkbox" id="input-regex-e" name="input-regex-e">
+                    <label for="input-regex-e">Ignore Whitespace (e)</label><br>
+                    
+                    <input type="checkbox" id="input-regex-s" name="input-regex-s">
+                    <label for="input-regex-s">Dot Matches Newline (s)</label><br>
+                    
+                    <input type="checkbox" id="input-regex-u" name="input-regex-u">
+                    <label for="input-regex-u">Full Unicode (u)</label><br>
+                    
+                    <input type="checkbox" id="input-regex-U" name="input-regex-U">
+                    <label for="input-regex-U">Lazy Quantifiers (U)</label><br>
+                    
+                    <input type="checkbox" id="input-regex-A" name="input-regex-A">
+                    <label for="input-regex-A">Anchored to Start or Last Pattern (A)</label><br>
+                    
+                    <input type="checkbox" id="input-regex-J" name="input-regex-J">
+                    <label for="input-regex-J">Allow Duplicate Subpattern Names (J)</label><br>
+                    
+                    <input type="checkbox" id="input-regex-D" name="input-regex-D">
+                    <label for="input-regex-D">Dollars Sign matches Pattern End (D)</label><br>
+                </details>
+                <details>
+                    <summary>Levenshtein Distance <i>The higher the cost of running all needed transforms, the less relevant a result is.</i></summary>
+
+                    <label for="input-levenshtein-distance-cost-insert">Insert Cost: <i>Every letter that must be added to a term increases the cost by this much.</i></label>
+                    <input type="number" id="input-levenshtein-distance-cost-insert" name="input-levenshtein-distance-cost-insert" value="1"><br>
+
+                    <label for="input-levenshtein-distance-cost-delete">Delete Cost: <i>Every letter that must be removed from a term increases the cost by this much.</i></label>
+                    <input type="number" id="input-levenshtein-distance-cost-delete" name="input-levenshtein-distance-cost-delete" value="1"><br>
+
+                    <label for="input-levenshtein-distance-cost-substitute">Substitute Cost: <i>Every letter that must be changed to a different letter increases the cost by this much.</i></label>
+                    <input type="number" id="input-levenshtein-distance-cost-substitute" name="input-levenshtein-distance-cost-substitute" value="1"><br>
+                </details>
+                <input type="checkbox" id="input-ignore-minor-words" name="input-ignore-minor-words" checked>
+                <label for="input-ignore-minor-words">Ignore Minor Words? <i>Ignore words like "a", "the", or "of" when searching.</i></label><br>
+
+                <input type="checkbox" id="input-ignore-case" name="input-ignore-case" checked>
+                <label for="input-ignore-case">Ignore Case? <i>Ignore case when searching.</i></label>
+            </fieldset>
+            <fieldset>
+                <input type="submit" value="Loading..." disabled>
+                <input type="reset" value="Clear">
+            </fieldset>
+        </form>
+        <button id="scroll-to-top" name="scroll-to-top" onclick="window.scroll({top: 0, left: 0, behavior: 'smooth'})">Scroll to top &uarr;</button>
     </body>
 </html>
