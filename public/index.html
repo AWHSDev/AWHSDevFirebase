@@ -10,7 +10,7 @@
                 background-color: gray;
                 font-family: Arial, Helvetica, sans-serif;
             }
-            fieldset, legend, header {
+            fieldset, legend, header, table {
                 background-color: whitesmoke;
                 border: 3px solid black;
                 padding: 0.5em;
@@ -79,7 +79,8 @@
                     },
                     get: function(target, property, reciever) {
                         if(typeof property === 'symbol') return [...elements][property];
-                        if(property.startsWith('$') && property !== '$')
+                        if(property === '$toArray') return function() {return [...elements]}
+                        else if(property.startsWith('$') && property !== '$')
                             if(typeof [...elements][property.substr(1)] === 'function') return function() {return [...elements][property.substr(1)](...arguments)}
                             else return [...elements][property.substring(1)]
 
@@ -250,6 +251,8 @@
                 const submit = $`input[type=submit]`
                 submit.value = 'Search'
                 submit.removeAttribute('disabled')
+
+                showData(mappedData)
             }
 
 
@@ -275,13 +278,244 @@
                     }))
                 })
             }
-            //data.filter(o => /\b(?:m[ea]n|male)\b/i.test(o.eligibility) || /\b(?:m[ea]n|male)\b/i.test(o.name))
+
+            function sortData() {
+                let result = [...mappedData]
+
+                if($`#input-renewable`.checked) result = result.filter(o => o.renewable === 'Yes')
+
+                function getDayOfYear(date){
+                    return (Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(date.getFullYear(), 0, 0)) / 24 / 60 / 60 / 1000;
+                }
+                if($`#input-open`.checked) result = result.filter(o => {
+                    const today = new Date();
+
+                    return today <= o.deadline.date || getDayOfYear(today) <= getDayOfYear(o.deadline.date)
+                })
+
+                const pattern = $`#input-regex-pattern`.value
+                if(pattern) {
+                    const flags = ($`#input-regex-g`.checked && 'g' || '')
+                        + ($`#input-regex-m`.checked && 'm' || '')
+                        + ($`#input-regex-i`.checked && 'i' || '')
+                        + ($`#input-regex-e`.checked && 'e' || '')
+                        + ($`#input-regex-s`.checked && 's' || '')
+                        + ($`#input-regex-u`.checked && 'u' || '')
+                        + ($`#input-regex-U`.checked && 'U' || '')
+                        + ($`#input-regex-A`.checked && 'A' || '')
+                        + ($`#input-regex-J`.checked && 'J' || '')
+                        + ($`#input-regex-D`.checked && 'D' || '')
+                    const regex = new RegExp(pattern, flags)
+                    result = result.filter(o => 
+                        regex.test(o.source.amount) ||
+                        regex.test(o.source.deadline) ||
+                        regex.test(o.source.eligibility) ||
+                        regex.test(o.source.name) ||
+                        regex.test(o.source.website) 
+                    )
+                }
+
+
+                function levenshteinDistance(str1 = '', str2 = '') {
+                    const track = Array(str2.length + 1).fill(null).map(() =>
+                    Array(str1.length + 1).fill(null));
+                    for (let i = 0; i <= str1.length; i += 1)
+                        track[0][i] = i;
+                    for (let j = 0; j <= str2.length; j += 1)
+                        track[j][0] = j;
+                    for (let j = 1; j <= str2.length; j += 1) {
+                        for (let i = 1; i <= str1.length; i += 1) {
+                            const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                            track[j][i] = Math.min(
+                                track[j][i - 1] + 1, // deletion
+                                track[j - 1][i] + 1, // insertion
+                                track[j - 1][i - 1] + indicator, // substitution
+                            );
+                        }
+                    }
+                    return track[str2.length][str1.length];
+                }
+
+                //$`#input-levenshtein-distance-cost-insert`.value
+                //$`#input-levenshtein-distance-cost-delete`.value
+                //$`#input-levenshtein-distance-cost-substitute`.value
+                //$`#input-ignore-minor-words`.checked
+
+                switch ($`#input-sort-mode`.options[$it.selectedIndex].value) {
+                    case 'relevance': {
+                        
+                        result = result.map( o => ({searchScore: 0, ...o}))
+
+                        const
+                            gpa = $`#input-gpa`.value,
+                            sat = $`#input-sat-score`.value,
+                            act = $`#input-act-score`.value,
+                            //$`#input-gender-not-listed`.value
+                            race = $`#input-race`.options[$it.selectedIndex].value
+                            
+                            const racePattern = new RegExp(race.replace(/,/g, '|'), 'i'.test)
+                            if(race !== 'unset')
+                                results.filter(o => racePattern.test(o.source.name) || racePattern.test(o.source.eligibility)).forEach(o => o.searchScore += 10)
+
+                            const lunchPattern = /lunch/i
+                            switch($`#input-fr-lunch`.options[$it.selectedIndex].value) {
+                                case 'unset': break
+                                case 'Yes': result.filter(o => !lunchPattern.test(o.source.eligibility)).forEach(o => o.searchScore += 5)
+                                case 'No': result = result.filter(o => !lunchPattern.test(o.source.eligibility))
+                            }
+
+                            const ethnicityPattern = /hispanic|latin[aox]/i
+                            switch(ethnicity = $`#input-ethnicity`.options[$it.selectedIndex].value) {
+                                case 'unset': break
+                                case 'Yes': result.filter(o => !ethnicityPattern.test(o.source.eligibility)).forEach(o => o.searchScore += 10)
+                                case 'No': result = result.filter(o => !ethnicityPattern.test(o.source.eligibility))
+                            }
+
+                            const genderPatternF = /\b(?:wom[ea]n|female|girl[s]?)\b/i, genderPatternM = /\b(?:m[ea]n|male|boy[s]?)\b/i
+                            switch($`#input-gender`.options[$it.selectedIndex].value) {
+                                case 'unset': break
+                                case 'female': {
+                                    result = result.filter(o => !(genderPatternM.test(o.source.eligibility) || genderPatternM.test(o.source.name)))
+                                    break
+                                }
+                                case 'male': {
+                                    result = result.filter(o => !(genderPatternF.test(o.source.eligibility) || genderPatternF.test(o.source.name)))
+                                    break
+                                }
+                                // Unfortunatly, there isn't a lot that can be done with the next 2 options.
+                                // The scholarships that are for a specific gender are all for binary genders.
+                                // In this case, just suggest any LGBT related scholarships and hide any binary ones.
+                                case 'enby':
+                                case 'not-listed': {
+                                    const lgbtPattern = 
+                                        // /[\s\S]*/
+                                        /lgbt|queer/i
+                                    
+                                    result = result.filter(o => !(genderPatternM.test(o.source.eligibility) || genderPatternM.test(o.source.name)))
+                                    result = result.filter(o => !(genderPatternF.test(o.source.eligibility) || genderPatternF.test(o.source.name)))
+
+                                    result.forEach(o => o.searchScore += 100*(lgbtPattern.test(o.source.name) || lgbtPattern.test(o.source.eligibility)))
+                                    break
+                                }
+                            }
+
+                        if(gpa) result = result.filter(o => parseFloat(o.gpa) <= parseFloat(gpa))
+                        if(sat) result = result.filter(o => parseFloat(o.sat) <= parseFloat(sat))
+                        if(act) result = result.filter(o => parseFloat(o.act) <= parseFloat(act))
+                        
+                        
+                        let queries = $$`#input-search-query + ol > li > strong`.textContent.$toArray()
+                        let excludes = $$`#input-search-query-not + ol > li > strong`.textContent.$toArray()
+                
+                        const query = $`#input-search-query`.value
+                        if(query) queries.push(query)
+
+                        const exclude = $`#input-search-query-not`.value
+                        if(exclude) excludes.push(exclude)
+
+                        const maxLevenshteinDistance = $`#input-levenshtein-distance-cost-max`.value
+                        result.forEach(o => {
+                            let sourceWords = [...o.source.eligibility.split(/\b/g), ...o.source.name.split(/\b/g)]
+                            if($`#input-ignore-case`.checked) {
+                                queries = queries.map(s => s.toLowerCase())
+                                excludes = excludes.map(s => s.toLowerCase())
+                                sourceWords = sourceWords.map(s => s.toLowerCase())
+                            }
+                            for(const q of queries)
+                                for(const w of sourceWords)
+                                    if(levenshteinDistance(q, w) <= maxLevenshteinDistance)
+                                        o.searchScore += 50
+                                    else if(w.includes(q))
+                                        o.searchScore += 40
+                            for(const e of excludes)
+                                for(const w of sourceWords)
+                                    if(levenshteinDistance(e, w) <= maxLevenshteinDistance)
+                                        o.searchScore -= 50
+                        })
+
+                        result = result.sort((a, b) => a.searchScore - b.searchScore).reverse()
+
+                        break
+                    }
+                    case 'name': {
+                        result = result.sort((a, b) => ('' + a.source.name).localeCompare(b.source.name))
+                        break
+                    }
+                    case 'amount': {
+                        function parseAmount(str) {
+                            return parseInt(str.split(/([0-9,]+)/)[1]?.replace(/,/g, ''))
+                        }
+                        result = result.sort((a, b) => 
+                            parseAmount(a.source.amount) - parseAmount(b.source.amount)
+                        )
+                        break
+                    }
+                    case 'deadline': {
+                        result = result.sort((a, b) => getDayOfYear(a) - getDayOfYear(b))
+                        break
+                    }
+                }
+                
+                return result
+            }
+
+
+            function showData(dataset) {
+                const table = $`tbody`
+                table.innerHTML = ''
+                dataset.forEach(o => 
+                    table.appendChild(New('tr', {
+                        children: [
+                            New('th', {
+                                textContent: o.source.name
+                            }),
+                            New('td', {
+                                textContent: o.source.amount
+                            }),
+                            New('td', {
+                                textContent: o.source.eligibility
+                            }),
+                            New('td', {
+                                textContent: o.renewable
+                            }),
+                            New('td', {
+                                textContent: o.sat
+                            }),
+                            New('td', {
+                                textContent: o.act
+                            }),
+                            New('td', {
+                                textContent: o.gpa
+                            }),
+                            New('td', {
+                                textContent: o.deadline.text + (o.deadline.absolute ? '' : '*')
+                            }),
+                            New('td', {
+                                children: [
+                                    New('a', {
+                                        href: o.source.website,
+                                        textContent: o.source.website
+                                    })
+                                ]
+                            }),
+                            New('td', {
+                                textContent: o.searchScore ?? 0
+                            })
+                        ]
+                    }))
+                )
+            }
+
+            function search() {
+                showData(sortData());
+                event.preventDefault()
+            }
             </script>
     </head>
     <body>
         <form onsubmit="event.preventDefault(), false">
             <header>
-                <h1>Scholorship Search</h1>
+                <h1>Scholarship Search</h1>
                 <p>&copy; T Wasinger 2021</p>
                 <h3>All questions are optional, but the more information you give the better results you will get.</h3>
                 <h3>For more details on a something, hover over the <i>Hello o(*°▽°*)o</i> icon.</h3>
@@ -319,11 +553,10 @@
                     <label for="input-search-query-not">Ignore Terms: <i>Put terms to avoid in this box. Seperate different entries with a comma.</i></label>
                     <input class="tag" type="text" id="input-search-query-not" name="input-search-query-not">
 
-                    <input type="checkbox" id="input-renewable" name="input-renewable">
-                    <label for="input-renewable">Must be renewable? <i>Some scholorships can be obtained for each year that you study, others are a one time deal.</i></label><br>
+                    <label for="input-gpa">GPA: <i>Your unweighted GPA (Up to a 4.0)</i></label>
+                    <input type="number" id="input-gpa" name="input-gpa" min="0" max="4.0" step="0.01" value="">
 
-                    <input type="checkbox" id="input-open" name="input-open" checked>
-                    <label for="input-open">Must be open? <i>Some scholorships may no longer be accepting applications.</i></label><br>
+                    <br>
 
                     <label for="input-sat-score">SAT Score: <i>Your combinded SAT Score (400-1600)</i></label>
                     <input type="number" id="input-sat-score" name="input-sat-score" min="400" max="1600" value="">
@@ -335,14 +568,14 @@
 
                     <br>
                     
-                    <label for="input-fr-lunch">Qualify For Free or Reduced Lunch: <i>Some scholorships use this as a basis for deciding financial need.</i></label>
+                    <label for="input-fr-lunch">Qualify For Free or Reduced Lunch: <i>Some scholarships use this as a basis for deciding financial need.</i></label>
                     <select id="input-fr-lunch" name="input-fr-lunch">
                         <option value="unset"></option>
                         <option value="Yes">Yes</option>
                         <option value="No">No</option>
                     </select><br>
 
-                    <label for="input-race">Race: <i>Some scholorships are based on race/ethnicity, but feel free to skip this question if you don't want to answer it.</i></label>
+                    <label for="input-race">Race: <i>Some scholarships are based on race/ethnicity, but feel free to skip this question if you don't want to answer it.</i></label>
                     <select id="input-race" name="input-race">
                         <option value="unset"></option>
                         <option value="American Indian, Alaska Native">American Indian or Alaska Native</option>
@@ -352,7 +585,7 @@
                         <option value="White">White</option>
                     </select><br>
 
-                    <label for="input-ethnicity">Hispanic or Latino: <i>Some scholorships are based on race/ethnicity, but feel free to skip this question if you don't want to answer it.</i></label>
+                    <label for="input-ethnicity">Hispanic or Latinx: <i>Some scholarships are based on race/ethnicity, but feel free to skip this question if you don't want to answer it.</i></label>
                     <select id="input-ethnicity" name="input-ethnicity">
                         <option value="unset"></option>
                         <option value="Yes">Yes</option>
@@ -360,7 +593,7 @@
                     </select><br>
 
 
-                    <lablel for="inout-gender">Gender: <i>Some scholorships are for specific genders, but feel free to skip this question if you would rather not answer it.</i></lablel>
+                    <lablel for="inout-gender">Gender: <i>Some scholarships are for specific genders, but feel free to skip this question if you would rather not answer it.</i></lablel>
                     <script>
                         function updateGenderInputs(value) {
                             let field = $`#add-another-gender-option`
@@ -393,10 +626,15 @@
                     <span id="add-another-gender-option" name="add-another-gender-option" style="display: none">
                         <lablel for="input-gender-not-listed">:</lablel>
                         <input type="text" id="input-gender-not-listed" name="input-gender-not-listed" placeholder="">
-                        <i>You can add words to describe your gender here to search for related scholorships. Seperate different phrases with a comma.</i>
+                        <i>You can add words to describe your gender here to search for related scholarships. Seperate different phrases with a comma.</i>
                     </span>
                     <br>
                 </div>
+                <input type="checkbox" id="input-renewable" name="input-renewable">
+                <label for="input-renewable">Must be renewable? <i>Some scholarships can be obtained for each year that you study, others are a one time deal.</i></label><br>
+
+                <input type="checkbox" id="input-open" name="input-open">
+                <label for="input-open">Must be open? <i>Some scholarships may no longer be accepting applications.</i></label><br>
             </fieldset>
             <fieldset>
                 <legend>Advanced Options <i>These are more advanced search tools for the technically inclined. If you don't know what you're doing, ignore these.</i></legend>
@@ -439,6 +677,9 @@
                 <details>
                     <summary>Levenshtein Distance <i>The higher the cost of running all needed transforms, the less relevant a result is.</i></summary>
 
+                    <label for="input-levenshtein-distance-cost-max">Max Cost: <i>After the cost is greater than this amount, consider the word not a match. (0 for an exact match)</i></label>
+                    <input type="number" id="input-levenshtein-distance-cost-max" name="input-levenshtein-distance-cost-max" value="1"><br>
+
                     <label for="input-levenshtein-distance-cost-insert">Insert Cost: <i>Every letter that must be added to a term increases the cost by this much.</i></label>
                     <input type="number" id="input-levenshtein-distance-cost-insert" name="input-levenshtein-distance-cost-insert" value="1"><br>
 
@@ -455,10 +696,25 @@
                 <label for="input-ignore-case">Ignore Case? <i>Ignore case when searching.</i></label>
             </fieldset>
             <fieldset>
-                <input type="submit" value="Loading..." disabled>
+                <input type="submit" value="Loading..." onclick="search()" disabled>
                 <input type="reset" value="Clear">
             </fieldset>
         </form>
+        <table>
+            <thead>
+                <th>Name</th>
+                <th>Amount</th>
+                <th>Eligibility</th>
+                <th>Is Renewable</th>
+                <th>Min SAT Score</th>
+                <th>Min ACT Score</th>
+                <th>Min GPA</th>
+                <th>Deadline</th>
+                <th>Webiste</th>
+                <th>Metadata</th>
+            </thead>
+            <tbody></tbody>
+        </table>
         <button id="scroll-to-top" name="scroll-to-top" onclick="window.scroll({top: 0, left: 0, behavior: 'smooth'})">Scroll to top &uarr;</button>
     </body>
 </html>
