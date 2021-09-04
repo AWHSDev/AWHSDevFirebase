@@ -70,6 +70,16 @@
                 bottom: 0.5em;
                 padding: 0.5em;
             }
+            table {
+                border-collapse: collapse;
+                margin: 0.5em;
+            }
+            th, td {
+                border: 2px solid black;
+            }
+            tr:nth-child(even) {
+                background-color: lightgray;
+            }
         </style>
         <script>
             function ElementArrayProxy(elements) {
@@ -165,7 +175,7 @@
                 $$`.tag`.$forEach(it => {
                     it.insertAdjacentElement('afterend', New('ol', {}))
                     it.onkeydown = function(event) {
-                        if(['Enter', ',', ' ', 'Tab'].includes(event.key)) {
+                        if(['Enter', ',', ' '].includes(event.key)) {
                             event.preventDefault()
                             const ol = $(`#${this.id} + ol`)
                             const li = New('li' , {
@@ -251,6 +261,8 @@
                 const submit = $`input[type=submit]`
                 submit.value = 'Search'
                 submit.removeAttribute('disabled')
+
+                $`input[type=reset]`.onclick = () => setTimeout(reset, 0)
 
                 showData(mappedData)
             }
@@ -423,13 +435,13 @@
                             }
                             for(const q of queries)
                                 for(const w of sourceWords)
-                                    if(levenshteinDistance(q, w) <= maxLevenshteinDistance)
+                                    if(levenshteinDistance(q, w) <= Math.max(1, Math.floor(q.length / 3) * maxLevenshteinDistance))
                                         o.searchScore += 50
                                     else if(w.includes(q))
                                         o.searchScore += 40
                             for(const e of excludes)
                                 for(const w of sourceWords)
-                                    if(levenshteinDistance(e, w) <= maxLevenshteinDistance)
+                                    if(levenshteinDistance(e, w) <= Math.max(1, Math.floor(e.length / 5) * maxLevenshteinDistance))
                                         o.searchScore -= 50
                         })
 
@@ -443,11 +455,11 @@
                     }
                     case 'amount': {
                         function parseAmount(str) {
-                            return parseInt(str.split(/([0-9,]+)/)[1]?.replace(/,/g, ''))
+                            return parseInt(str.split(/([0-9,]{3,})/)[1]?.replace(/,/g, '')) || 100000
                         }
                         result = result.sort((a, b) => 
                             parseAmount(a.source.amount) - parseAmount(b.source.amount)
-                        )
+                        ).reverse()
                         break
                     }
                     case 'deadline': {
@@ -493,7 +505,7 @@
                             New('td', {
                                 children: [
                                     New('a', {
-                                        href: o.source.website,
+                                        href: /^https?:\/\//.test(o.source.website) ? o.source.website : '//' + o.source.website,
                                         textContent: o.source.website
                                     })
                                 ]
@@ -509,6 +521,13 @@
             function search() {
                 showData(sortData());
                 event.preventDefault()
+            }
+
+            function reset() {
+                updateSearchFields('relevance')
+                updateGenderInputs('unset')
+                $`#input-search-query + ol`.innerHTML = ''
+                $`#input-search-query-not + ol`.innerHTML = ''
             }
             </script>
     </head>
@@ -677,7 +696,7 @@
                 <details>
                     <summary>Levenshtein Distance <i>The higher the cost of running all needed transforms, the less relevant a result is.</i></summary>
 
-                    <label for="input-levenshtein-distance-cost-max">Max Cost: <i>After the cost is greater than this amount, consider the word not a match. (0 for an exact match)</i></label>
+                    <label for="input-levenshtein-distance-cost-max">Max Cost: <i>After the cost per every three letters cheked is greater than this amount, the word considered not a match. (0 for an exact match)</i></label>
                     <input type="number" id="input-levenshtein-distance-cost-max" name="input-levenshtein-distance-cost-max" value="1"><br>
 
                     <label for="input-levenshtein-distance-cost-insert">Insert Cost: <i>Every letter that must be added to a term increases the cost by this much.</i></label>
